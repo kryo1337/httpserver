@@ -20,15 +20,24 @@ pub fn main() !void {
     try stdout.print("\n", .{});
 
     while (true) {
-        var connection = try server.accept();
-        {
-            defer connection.stream.close();
+        const connection = try server.accept();
+        const thread = try std.Thread.spawn(
+            std.Thread.SpawnConfig{ .stack_size = 8192 },
+            handleConnection,
+            .{connection},
+        );
+        thread.detach();
+    }
+}
 
-            var buffer: [1024]u8 = undefined;
-            const bytesRead = try connection.stream.read(&buffer);
-            if (bytesRead > 0) {
-                try connection.stream.writeAll(buffer[0..bytesRead]);
-            }
-        }
+pub fn handleConnection(conn: std.net.Server.Connection) void {
+    var connection = conn;
+    defer connection.stream.close();
+
+    var buffer: [1024]u8 = undefined;
+    while (true) {
+        const bytesRead = connection.stream.read(&buffer) catch break;
+        if (bytesRead == 0) break;
+        _ = connection.stream.writeAll(buffer[0..bytesRead]) catch break;
     }
 }
